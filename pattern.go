@@ -77,9 +77,10 @@ func (p Pattern) findDepInPackage(pkg *packages.Package) Matches {
 			targetIdents[ident] = true
 		}
 	}
-	if len(targetIdents) == 0 {
-		return nil
-	}
+
+	// len(targetIdents) == 0, doens't mean there is no match in current file, since there might be unqualified selector expressions, who .X is not necessarily an ident.
+	// So we have to proceed.
+
 	matches := Matches{}
 	for _, file := range pkg.Syntax {
 		ast.Inspect(file, func(node ast.Node) bool {

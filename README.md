@@ -21,13 +21,13 @@ In case of finding external functions/methods, the tool currently only support s
 
 ## Example
 
-Below example is to look for all method calls (`.*()`) on types named `Client`, which belongs to packages whos import path matches pattern `github.com/tombuildsstuff/giovanni/storage/.*`, among all the packages under `./internal` directory (`./internal/...`):
+Below example is to look for all method calls of `.Position()` on type `FileSet`, which is defined in package `go/token`, among the `ged` codebase:
 
 ```shell
-terraform-provider-azurerm on  main via 🐹 v1.17.7
-💤  ged -p 'github.com/tombuildsstuff/giovanni/storage/.*:Client:.*()' ./internal/...
-/home/magodo/github/terraform-provider-azurerm/internal/services/storage/shim/containers_data_plane.go:30:18
-/home/magodo/github/terraform-provider-azurerm/internal/services/storage/shim/containers_data_plane.go:53:15
-/home/magodo/github/terraform-provider-azurerm/internal/services/storage/shim/containers_data_plane.go:62:19
-<omit>
+ged on  main via 🐹 v1.17.7 
+💤  ged -p 'go/token:FileSet:Position()' .
+go/token FileSet.Position():
+        /home/magodo/github/ged/pattern.go:98:7
+        /home/magodo/github/ged/pattern.go:128:21
+        /home/magodo/github/ged/pattern.go:167:20
 ```
