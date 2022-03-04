@@ -4,6 +4,8 @@
 
 **G**et **e**xternal **d**ependencies of Go code.
 
+In case of finding external functions/methods, the tool currently only support statically dispatched calls.
+
 ## Install
 
     go install github.com/magodo/ged
