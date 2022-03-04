@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 	"regexp"
 	"strings"
 	"testing"
@@ -89,121 +88,119 @@ func TestParsePattern(t *testing.T) {
 }
 
 func TestFindDepInPackages(t *testing.T) {
+	root, _ := os.Getwd()
 	cases := []struct {
 		name   string
 		pwd    string
 		p      string
 		gopkgs []string
-		expect []string
+		expect string
 	}{
 		{
 			name:   "Find package type",
 			pwd:    "./testdata/usepkg1/pkgtype",
 			p:      "uut/pkg1:T1",
 			gopkgs: []string{"."},
-			expect: []string{
-				"pkgtype.go:8:11",
-			},
+			expect: fmt.Sprintf(`uut/pkg1 T1:
+	%s/testdata/usepkg1/pkgtype/pkgtype.go:8:11
+`, root),
 		},
 		{
 			name:   "Find package func",
 			pwd:    "./testdata/usepkg1/pkgfunc",
 			p:      "uut/pkg1:F1",
 			gopkgs: []string{"."},
-			expect: []string{
-				"pkgfunc.go:8:7",
-			},
+			expect: fmt.Sprintf(`uut/pkg1 F1:
+	%s/testdata/usepkg1/pkgfunc/pkgfunc.go:8:7
+`, root),
 		},
 		{
 			name:   "Find regular struct field",
 			pwd:    "./testdata/usepkg1/typefield",
 			p:      "uut/pkg1:T1:T1F1",
 			gopkgs: []string{"."},
-			expect: []string{
-				"typefield.go:10:6",
-			},
+			expect: fmt.Sprintf(`uut/pkg1 T1.T1F1:
+	%s/testdata/usepkg1/typefield/typefield.go:10:6
+`, root),
 		},
 		{
 			name:   "Find struct embedded field",
 			pwd:    "./testdata/usepkg1/typefield",
 			p:      "uut/pkg1:T1:T2",
 			gopkgs: []string{"."},
-			expect: []string{
-				"typefield.go:12:6",
-			},
+			expect: fmt.Sprintf(`uut/pkg1 T1.T2:
+	%s/testdata/usepkg1/typefield/typefield.go:12:6
+`, root),
 		},
 		{
 			name:   "Find struct field that is a field of an embedded field",
 			pwd:    "./testdata/usepkg1/typefield",
 			p:      "uut/pkg1:T1:T2F1",
 			gopkgs: []string{"."},
-			expect: []string{
-				"typefield.go:11:6",
-			},
+			expect: fmt.Sprintf(`uut/pkg1 T1.T2F1:
+	%s/testdata/usepkg1/typefield/typefield.go:11:6
+`, root),
 		},
 		{
 			name:   "Find field of an embedded struct that is not explicitly referenced should return nothing",
 			pwd:    "./testdata/usepkg1/typefield",
 			p:      "uut/pkg1:T2:T2F1",
 			gopkgs: []string{"."},
-			expect: nil,
+			expect: "",
 		},
 		{
 			name:   "Find method on a type, for both the type or a pointer to the type",
 			pwd:    "./testdata/usepkg1/typemethod",
 			p:      "uut/pkg1:T1:F1()",
 			gopkgs: []string{"."},
-			expect: []string{
-				"typemethod.go:9:2",
-				"typemethod.go:13:2",
-			},
+			expect: fmt.Sprintf(`uut/pkg1 T1.F1():
+	%s/testdata/usepkg1/typemethod/typemethod.go:9:2
+	%s/testdata/usepkg1/typemethod/typemethod.go:13:2
+`, root, root),
 		},
 		{
 			name:   "Find method on the pointer to a type, for both the type or a pointer to the type",
 			pwd:    "./testdata/usepkg1/typemethod",
 			p:      "uut/pkg1:T1:F2()",
 			gopkgs: []string{"."},
-			expect: []string{
-				"typemethod.go:10:2",
-				"typemethod.go:14:2",
-			},
+			expect: fmt.Sprintf(`uut/pkg1 T1.F2():
+	%s/testdata/usepkg1/typemethod/typemethod.go:10:2
+	%s/testdata/usepkg1/typemethod/typemethod.go:14:2
+`, root, root),
 		},
 		{
 			name:   "Find a method across packages",
 			pwd:    "./testdata/crosspkgs",
 			p:      "uut/pkg.*:T1:F1()",
 			gopkgs: []string{"."},
-			expect: []string{
-				"crosspkgs.go:11:2",
-				"crosspkgs.go:12:2",
-			},
+			expect: fmt.Sprintf(`uut/pkg1 T1.F1():
+	%s/testdata/crosspkgs/crosspkgs.go:11:2
+uut/pkg2 T1.F1():
+	%s/testdata/crosspkgs/crosspkgs.go:12:2
+`, root, root),
 		},
 		{
 			name:   "Find method patterns (F.*) across packages",
 			pwd:    "./testdata/crosspkgs",
 			p:      "uut/pkg.*:T1:F.*()",
 			gopkgs: []string{"."},
-			expect: []string{
-				"crosspkgs.go:11:2",
-				"crosspkgs.go:12:2",
-				"crosspkgs.go:13:2",
-			},
+			expect: fmt.Sprintf(`uut/pkg1 T1.F1():
+	%s/testdata/crosspkgs/crosspkgs.go:11:2
+uut/pkg2 T1.F1():
+	%s/testdata/crosspkgs/crosspkgs.go:12:2
+uut/pkg2 T1.F2():
+	%s/testdata/crosspkgs/crosspkgs.go:13:2
+`, root, root, root),
 		},
 	}
 
-	root, _ := os.Getwd()
-	for idx, c := range cases {
+	for _, c := range cases {
 		os.Chdir(c.pwd)
-		pwd, _ := os.Getwd()
 		pattern, err := parsePattern(c.p)
-		require.NoError(t, err, idx)
-		positions, err := pattern.FindDepInPackages(c.gopkgs)
-		require.NoError(t, err, idx)
-		var actual []string
-		for _, pos := range positions {
-			actual = append(actual, strings.TrimPrefix(pos.String(), pwd+string(filepath.Separator)))
-		}
-		require.Equal(t, c.expect, actual, idx)
+		require.NoError(t, err, c.name)
+		matches, err := pattern.FindDepInPackages(c.gopkgs)
+		require.NoError(t, err, c.name)
+		require.Equal(t, c.expect, matches.String(), c.name)
 		os.Chdir(root)
 	}
 }
