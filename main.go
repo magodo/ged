@@ -110,25 +110,8 @@ func (p Pattern) findDepInPackage(pkg *packages.Package) []token.Position {
 				if _, ok := targetIdents[ident]; !ok {
 					return true
 				}
-				switch {
-				case p.field != nil:
-					field, ok := pkg.TypesInfo.Uses[sel.Sel].(*types.Var)
-					if !ok {
-						return true
-					}
-					selName := field.Name()
-					if p.field.MatchString(selName) {
-						positions = append(positions, pkg.Fset.Position(sel.Pos()))
-					}
-				case p.method != nil:
-					fun, ok := pkg.TypesInfo.Uses[sel.Sel].(*types.Func)
-					if !ok {
-						return true
-					}
-					selName := fun.Name()
-					if p.method.MatchString(selName) {
-						positions = append(positions, pkg.Fset.Position(sel.Pos()))
-					}
+				if p.matchSelSelObj(pkg, pkg.TypesInfo.Uses[sel.Sel]) {
+					positions = append(positions, pkg.Fset.Position(sel.Pos()))
 				}
 				return true
 			}
@@ -156,30 +139,34 @@ func (p Pattern) findDepInPackage(pkg *packages.Package) []token.Position {
 				return true
 			}
 
-			switch {
-			case p.field != nil:
-				field, ok := tsel.Obj().(*types.Var)
-				if !ok {
-					return true
-				}
-				selName := field.Name()
-				if p.field.MatchString(selName) {
-					positions = append(positions, pkg.Fset.Position(sel.Pos()))
-				}
-			case p.method != nil:
-				fun, ok := tsel.Obj().(*types.Func)
-				if !ok {
-					return true
-				}
-				selName := fun.Name()
-				if p.method.MatchString(selName) {
-					positions = append(positions, pkg.Fset.Position(sel.Pos()))
-				}
+			if p.matchSelSelObj(pkg, tsel.Obj()) {
+				positions = append(positions, pkg.Fset.Position(sel.Pos()))
 			}
 			return true
 		})
 	}
 	return positions
+}
+
+func (p Pattern) matchSelSelObj(pkg *packages.Package, selSelObj types.Object) bool {
+	switch {
+	case p.field != nil:
+		field, ok := selSelObj.(*types.Var)
+		if !ok {
+			return false
+		}
+		selName := field.Name()
+		return p.field.MatchString(selName)
+	case p.method != nil:
+		fun, ok := selSelObj.(*types.Func)
+		if !ok {
+			return false
+		}
+		selName := fun.Name()
+		return p.method.MatchString(selName)
+	default:
+		panic("pattern has no field/method pattern")
+	}
 }
 
 func (p Pattern) FindDepInPackages(gopkgs []string) ([]token.Position, error) {
